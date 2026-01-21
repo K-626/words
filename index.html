@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wordle-Unlimited</title>
+    <title>Wordle (3-10 Chars)</title>
     <style>
         :root {
             --bg-color: #121213;
@@ -13,8 +13,7 @@
             --absent: #3a3a3c;
             --key-bg: #818384;
             --key-text: #ffffff;
-            --header-height: 40px;
-            --keyboard-height: 200px;
+            --header-height: 50px;
         }
 
         * { box-sizing: border-box; }
@@ -28,7 +27,6 @@
             color: white;
             margin: 0;
             padding: 0;
-            /* 画面内に収めるための設定 */
             height: 100dvh;
             overflow: hidden;
         }
@@ -39,28 +37,41 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            padding: 0 15px;
+            padding: 0 10px;
             border-bottom: 1px solid var(--tile-border);
+            font-size: 0.8rem;
+            flex-shrink: 0;
         }
 
-        h1 { font-size: 1.2rem; margin: 0; letter-spacing: 2px; }
+        /* セレクトボックスのカスタム */
+        select.custom-select {
+            background-color: #272729;
+            color: white;
+            border: 1px solid #3a3a3c;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            outline: none;
+        }
 
-        /* モード切替スイッチ */
-        .mode-switch {
+        /* スイッチ共通スタイル */
+        .switch-group {
             display: flex;
             background: #272729;
             border-radius: 4px;
             padding: 2px;
+            margin-left: 10px;
         }
-        .mode-switch button {
+        .switch-group button {
             background: none; border: none; color: #818384;
-            padding: 2px 8px; cursor: pointer; font-size: 0.7rem; font-weight: bold;
+            padding: 4px 8px; cursor: pointer; font-size: 0.75rem; font-weight: bold;
         }
-        .mode-switch button.active {
+        .switch-group button.active {
             background: #565758; color: white; border-radius: 2px;
         }
 
-        /* メインゲームエリア（盤面） */
+        /* メインゲームエリア */
         #game-container {
             flex-grow: 1;
             display: flex;
@@ -69,26 +80,25 @@
             align-items: center;
             width: 100%;
             padding: 10px;
+            overflow-y: auto;
         }
 
         #game-board {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
+            gap: 3px;
             width: 100%;
-            max-width: 300px; /* 盤面の最大幅 */
+            margin: auto;
         }
 
         .tile {
             aspect-ratio: 1 / 1;
             border: 2px solid var(--tile-border);
             display: flex; justify-content: center; align-items: center;
-            font-size: clamp(1.2rem, 5vh, 2rem); /* 画面の高さに応じて文字サイズ変更 */
             font-weight: bold; text-transform: uppercase;
-            transition: background-color 0.3s;
+            font-size: clamp(0.8rem, 3.5vw, 2rem); 
+            transition: background-color 0.3s, transform 0.1s;
         }
 
-        /* 判定後の色（最優先） */
         .tile.correct { background-color: var(--correct) !important; border-color: var(--correct) !important; }
         .tile.present { background-color: var(--present) !important; border-color: var(--present) !important; }
         .tile.absent  { background-color: var(--absent) !important; border-color: var(--absent) !important; }
@@ -97,64 +107,65 @@
         #keyboard-area {
             width: 100%;
             max-width: 500px;
-            padding: 10px 5px 20px 5px;
+            padding: 5px 2px 20px 2px;
+            flex-shrink: 0;
         }
 
-        #keyboard-container {
-            display: flex; flex-direction: column; gap: 8px;
-        }
-
-        .keyboard-row {
-            display: flex; justify-content: center; gap: 4px; touch-action: manipulation;
-        }
-
+        #keyboard-container { display: flex; flex-direction: column; gap: 6px; }
+        .keyboard-row { display: flex; justify-content: center; gap: 3px; touch-action: manipulation; }
         .key {
-            flex: 1;
-            height: 50px;
-            background-color: var(--key-bg);
-            color: var(--key-text);
+            flex: 1; height: 48px;
+            background-color: var(--key-bg); color: var(--key-text);
             border-radius: 4px; border: none;
-            font-weight: bold; font-size: 0.9rem;
+            font-weight: bold; font-size: 1rem;
             cursor: pointer; display: flex; justify-content: center; align-items: center;
+            user-select: none;
         }
-        
-        /* キーボードの色（!importantで確実に反映） */
         .key.correct { background-color: var(--correct) !important; }
         .key.present { background-color: var(--present) !important; }
         .key.absent  { background-color: var(--absent) !important; }
-
         .key-wide { flex: 1.5; font-size: 0.7rem; }
 
-        /* メッセージ */
         #message {
-            position: absolute; top: 60px;
+            position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
             background: white; color: black;
-            padding: 8px 15px; border-radius: 4px;
+            padding: 10px 20px; border-radius: 4px;
             font-weight: bold; font-size: 0.9rem;
-            display: none; z-index: 10;
+            display: none; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            white-space: nowrap;
         }
 
-        /* 従来のデザイン (Classic) */
+        /* Classic Mode */
         #classic-input-area {
             display: none; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px;
         }
         #classic-input-area input {
             padding: 10px; font-size: 1.2rem; background: var(--bg-color);
-            color: white; border: 1px solid #565758; width: 150px; text-align: center;
+            color: white; border: 1px solid #565758; width: 220px; text-align: center;
         }
-
-        .btn-ui { padding: 8px 15px; border-radius: 4px; border: 1px solid #565758; background: none; color: white; cursor: pointer; }
+        .btn-ui { padding: 8px 15px; border-radius: 4px; border: 1px solid #565758; background: none; color: white; cursor: pointer; font-size: 0.7rem; margin-left: 5px;}
     </style>
 </head>
 <body>
 
     <header>
-        <h1>WORDLE</h1>
-        <div class="mode-switch">
+        <select id="length-select" class="custom-select" onchange="changeLength(parseInt(this.value))">
+            <option value="3">3 Letters</option>
+            <option value="4">4 Letters</option>
+            <option value="5" selected>5 Letters</option>
+            <option value="6">6 Letters</option>
+            <option value="7">7 Letters</option>
+            <option value="8">8 Letters</option>
+            <option value="9">9 Letters</option>
+            <option value="10">10 Letters</option>
+        </select>
+
+        <div class="switch-group">
             <button id="btn-mode-kb" class="active" onclick="switchUI('kb')">KB</button>
-            <button id="btn-mode-classic" onclick="switchUI('classic')">CLASSIC</button>
+            <button id="btn-mode-classic" onclick="switchUI('classic')">TXT</button>
         </div>
-        <button class="btn-ui" style="font-size: 0.6rem;" onclick="resetGame()">RESET</button>
+
+        <button class="btn-ui" onclick="resetGame()">RESET</button>
     </header>
 
     <div id="message"></div>
@@ -168,13 +179,27 @@
     </div>
 
     <div id="classic-input-area">
-        <input type="text" id="classic-input" maxlength="5" placeholder="5文字">
-        <button class="btn-ui" onclick="submitGuess()" style="background: #818384;">判定</button>
+        <input type="text" id="classic-input" placeholder="Type here">
+        <button class="btn-ui" onclick="submitGuess()" style="background: #818384;">GUESS</button>
     </div>
 
     <script>
-        const DICTIONARY_URL = "https://cdn.jsdelivr.net/gh/tabatkins/wordle-list@main/words";
-        let wordList = [], secretWord = "", currentRow = 0, currentGuess = "", isGameOver = false, keyStates = {};
+        // 汎用辞書 (3,4,6-10文字用)
+        const DICTIONARY_URL_ALL = "https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt";
+        // 5文字専用辞書 (Wordleオリジナルなど)
+        const DICTIONARY_URL_5 = "https://cdn.jsdelivr.net/gh/tabatkins/wordle-list@main/words";
+        
+        let allWords = [];       // 汎用辞書データ
+        let fiveCharWords = [];  // 5文字専用データ
+        let currentWordList = [];
+        let secretWord = "";
+        let currentRow = 0;
+        let currentGuess = "";
+        let isGameOver = false;
+        let keyStates = {};
+        
+        let wordLength = 5;
+        const maxGuesses = 6;
 
         function switchUI(mode) {
             const kbArea = document.getElementById('keyboard-area');
@@ -192,36 +217,104 @@
                 classicArea.style.display = 'flex';
                 btnKb.classList.remove('active');
                 btnClassic.classList.add('active');
+                document.getElementById('classic-input').focus();
             }
         }
 
         async function initGame() {
-            createBoard();
             createKeyboard();
+            showMsg("Loading Dictionaries...", true);
             try {
-                const res = await fetch(DICTIONARY_URL);
-                const text = await res.text();
-                wordList = text.split(/\s+/).map(w => w.trim().toUpperCase()).filter(w => w.length === 5);
-                startNewRound();
+                // 両方の辞書を並列ロード
+                const [resAll, res5] = await Promise.all([
+                    fetch(DICTIONARY_URL_ALL),
+                    fetch(DICTIONARY_URL_5)
+                ]);
 
+                const textAll = await resAll.text();
+                const text5 = await res5.text();
+
+                // 辞書パース
+                allWords = textAll.split(/\r?\n/).map(w => w.trim().toUpperCase());
+                fiveCharWords = text5.split(/\s+/).map(w => w.trim().toUpperCase()).filter(w => w.length === 5);
+
+                document.getElementById('message').style.display = "none";
+                
+                // 初期開始 (5文字モード)
+                changeLength(5, true);
+
+                // イベント
                 document.addEventListener("keydown", (e) => {
                     if (isGameOver || document.activeElement.id === 'classic-input') return;
                     handleInput(e.key.toUpperCase());
                 });
 
-                document.getElementById('classic-input').addEventListener('input', (e) => {
+                const classicInput = document.getElementById('classic-input');
+                classicInput.addEventListener('input', (e) => {
                     currentGuess = e.target.value.toUpperCase();
                     updateCurrentRow();
                 });
-            } catch (e) { showMsg("Dictionary Load Error"); }
+                classicInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') submitGuess();
+                });
+
+            } catch (e) { 
+                console.error(e);
+                showMsg("Dictionary Load Error"); 
+            }
+        }
+
+        function changeLength(len, force = false) {
+            if (!force && len === wordLength) return;
+            if (!force && !isGameOver && currentRow > 0) {
+                // 確認メッセージを英語に
+                if(!confirm("Change length and restart game?")) {
+                    document.getElementById('length-select').value = wordLength;
+                    return;
+                }
+            }
+
+            wordLength = len;
+            document.getElementById('length-select').value = len;
+
+            const input = document.getElementById('classic-input');
+            input.setAttribute('maxlength', len);
+            input.setAttribute('placeholder', `${len} Letters`);
+
+            // 辞書の切り替えロジック
+            if (len === 5) {
+                // 5文字の時は専用辞書を使用
+                currentWordList = fiveCharWords;
+            } else {
+                // それ以外は汎用辞書から抽出
+                currentWordList = allWords.filter(w => w.length === wordLength);
+            }
+            
+            if (currentWordList.length === 0) {
+                showMsg(`No ${len}-letter words found!`);
+                return;
+            }
+
+            startNewRound();
         }
 
         function createBoard() {
             const b = document.getElementById("game-board");
             b.innerHTML = "";
-            for (let i = 0; i < 30; i++) {
+            
+            const idealWidth = wordLength * 60; 
+            const maxWidth = Math.min(idealWidth, 500);
+            
+            b.style.width = "100%";
+            b.style.maxWidth = `${Math.max(250, maxWidth)}px`;
+            b.style.gridTemplateColumns = `repeat(${wordLength}, 1fr)`;
+
+            const totalTiles = maxGuesses * wordLength;
+
+            for (let i = 0; i < totalTiles; i++) {
                 let t = document.createElement("div");
-                t.className = "tile"; t.id = "tile-" + i;
+                t.className = "tile";
+                t.id = "tile-" + i;
                 b.appendChild(t);
             }
         }
@@ -244,7 +337,10 @@
             const b = document.createElement("button");
             b.textContent = label; b.className = "key " + cls;
             b.dataset.key = val || label;
-            b.onclick = (e) => { e.preventDefault(); handleInput(b.dataset.key); };
+            b.onclick = (e) => { 
+                e.preventDefault(); e.stopPropagation();
+                handleInput(b.dataset.key); 
+            };
             cont.appendChild(b);
         }
 
@@ -254,7 +350,7 @@
                 submitGuess();
             } else if (key === "BACKSPACE" || key === "⌫") {
                 currentGuess = currentGuess.slice(0, -1);
-            } else if (/^[A-Z]$/.test(key) && currentGuess.length < 5) {
+            } else if (/^[A-Z]$/.test(key) && currentGuess.length < wordLength) {
                 currentGuess += key;
             }
             document.getElementById('classic-input').value = currentGuess;
@@ -262,27 +358,52 @@
         }
 
         function updateCurrentRow() {
-            for (let i = 0; i < 5; i++) {
-                const t = document.getElementById(`tile-${currentRow * 5 + i}`);
-                t.textContent = currentGuess[i] || "";
+            const startIdx = currentRow * wordLength;
+            for (let i = 0; i < wordLength; i++) {
+                const t = document.getElementById(`tile-${startIdx + i}`);
+                if (t) {
+                    t.textContent = currentGuess[i] || "";
+                    t.style.borderColor = currentGuess[i] ? "#818384" : "#3a3a3c";
+                }
             }
         }
 
         function submitGuess() {
-            if (currentGuess.length !== 5) return showMsg("5 letters required");
-            if (!wordList.includes(currentGuess)) return showMsg("Not in word list");
+            if (currentGuess.length !== wordLength) {
+                showMsg("Not enough letters"); // 英語化
+                shakeRow();
+                return;
+            }
+            if (!currentWordList.includes(currentGuess)) {
+                showMsg("Not in word list"); // 英語化
+                shakeRow();
+                return;
+            }
             
             const colors = checkWord(currentGuess, secretWord);
-            for (let i = 0; i < 5; i++) {
-                const tile = document.getElementById(`tile-${currentRow * 5 + i}`);
-                tile.classList.add(colors[i]);
-            }
-            updateKeyboardColors(currentGuess, colors);
+            const startIdx = currentRow * wordLength;
 
+            for (let i = 0; i < wordLength; i++) {
+                const tile = document.getElementById(`tile-${startIdx + i}`);
+                setTimeout(() => {
+                    tile.classList.add(colors[i]);
+                    tile.style.borderColor = "transparent";
+                }, i * 100);
+            }
+
+            setTimeout(() => {
+                updateKeyboardColors(currentGuess, colors);
+                checkWinCondition();
+            }, wordLength * 100 + 100);
+        }
+
+        function checkWinCondition() {
             if (currentGuess === secretWord) {
-                showMsg("🎉 Correct!", true); isGameOver = true;
-            } else if (++currentRow >= 6) {
-                showMsg("Answer: " + secretWord, true); isGameOver = true;
+                showMsg("🎉 Correct!", true); // 英語化
+                isGameOver = true;
+            } else if (++currentRow >= maxGuesses) {
+                showMsg("Answer: " + secretWord, true); // 英語化
+                isGameOver = true;
             } else {
                 currentGuess = "";
                 document.getElementById('classic-input').value = "";
@@ -290,16 +411,30 @@
         }
 
         function checkWord(g, s) {
-            let res = Array(5).fill("absent"), sc = s.split(""), gc = g.split("");
-            for (let i=0; i<5; i++) if (gc[i]===sc[i]) { res[i]="correct"; sc[i]=gc[i]=null; }
-            for (let i=0; i<5; i++) if (gc[i]) { 
-                let idx=sc.indexOf(gc[i]); if (idx!==-1) { res[i]="present"; sc[idx]=null; }
+            let res = Array(wordLength).fill("absent");
+            let sc = s.split("");
+            let gc = g.split("");
+
+            for (let i = 0; i < wordLength; i++) {
+                if (gc[i] === sc[i]) {
+                    res[i] = "correct";
+                    sc[i] = null; gc[i] = null;
+                }
+            }
+            for (let i = 0; i < wordLength; i++) {
+                if (gc[i]) { 
+                    let idx = sc.indexOf(gc[i]);
+                    if (idx !== -1) {
+                        res[i] = "present";
+                        sc[idx] = null;
+                    }
+                }
             }
             return res;
         }
 
         function updateKeyboardColors(g, cls) {
-            for (let i=0; i<5; i++) {
+            for (let i = 0; i < wordLength; i++) {
                 const char = g[i], c = cls[i];
                 if (keyStates[char] === "correct") continue;
                 if (keyStates[char] === "present" && c !== "correct") continue;
@@ -314,23 +449,50 @@
             });
         }
 
-        function showMsg(t, p = false) {
+        function showMsg(t, persist = false) {
             const m = document.getElementById('message');
             m.textContent = t; m.style.display = "block";
-            if(!p) setTimeout(() => m.style.display="none", 2000);
+            if(!persist) setTimeout(() => m.style.display="none", 2000);
+        }
+
+        function shakeRow() {
+            const startIdx = currentRow * wordLength;
+            for(let i=0; i<wordLength; i++){
+                const tile = document.getElementById(`tile-${startIdx + i}`);
+                if(tile) {
+                    tile.style.transform = "translateX(5px)";
+                    setTimeout(()=> tile.style.transform = "translateX(-5px)", 50);
+                    setTimeout(()=> tile.style.transform = "translateX(0)", 100);
+                }
+            }
         }
 
         function startNewRound() {
-            secretWord = wordList[Math.floor(Math.random() * wordList.length)];
+            if (currentWordList.length === 0) return;
+            secretWord = currentWordList[Math.floor(Math.random() * currentWordList.length)];
             console.log("Secret:", secretWord);
-            currentRow = 0; currentGuess = ""; isGameOver = false; keyStates = {};
+            
+            currentRow = 0;
+            currentGuess = "";
+            isGameOver = false;
+            keyStates = {};
+            
             createBoard();
-            document.querySelectorAll(".key").forEach(k => k.className = k.classList.contains("key-wide") ? "key key-wide" : "key");
+            
+            document.querySelectorAll(".key").forEach(k => {
+                k.classList.remove("correct", "present", "absent");
+            });
+
             document.getElementById('classic-input').value = "";
             document.getElementById('message').style.display = "none";
         }
 
-        function resetGame() { if (isGameOver || confirm("Reset game?")) startNewRound(); }
+        function resetGame() {
+            // メッセージ英語化
+            if (isGameOver || confirm("Reset game?")) {
+                startNewRound();
+            }
+        }
 
         initGame();
     </script>
