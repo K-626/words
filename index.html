@@ -100,7 +100,6 @@
         .tile.present { background-color: var(--present) !important; border-color: var(--present) !important; }
         .tile.absent  { background-color: var(--absent) !important; border-color: var(--absent) !important; }
 
-        /* KEYBOARD AREA: Optimized for Mobile */
         #keyboard-area {
             width: 100%;
             max-width: 500px;
@@ -141,6 +140,13 @@
             color: white; border: 1px solid #565758; width: 220px; text-align: center;
         }
         .btn-ui { padding: 8px 15px; border-radius: 4px; border: 1px solid #565758; background: none; color: white; cursor: pointer; font-size: 0.7rem; margin-left: 5px;}
+        
+        /* SHAREボタン専用スタイル */
+        #share-btn {
+            background-color: var(--correct);
+            border-color: var(--correct);
+            display: none; /* 初期は非表示 */
+        }
     </style>
 </head>
 <body>
@@ -162,7 +168,10 @@
             <button id="btn-mode-classic" onclick="switchUI('classic')">TXT</button>
         </div>
 
-        <button class="btn-ui" onclick="resetGame()">RESET</button>
+        <div>
+            <button id="share-btn" class="btn-ui" onclick="shareResult()">SHARE</button>
+            <button class="btn-ui" onclick="resetGame()">RESET</button>
+        </div>
     </header>
 
     <div id="message"></div>
@@ -187,6 +196,7 @@
         let allWords = [], fiveCharWords = [], currentWordList = [];
         let secretWord = "", currentRow = 0, currentGuess = "", isGameOver = false, keyStates = {};
         let wordLength = 5;
+        let isSharedGame = false;
         const maxGuesses = 6;
 
         function switchUI(mode) {
@@ -211,7 +221,21 @@
                 allWords = textAll.split(/\r?\n/).map(w => w.trim().toUpperCase());
                 fiveCharWords = text5.split(/\s+/).map(w => w.trim().toUpperCase()).filter(w => w.length === 5);
                 document.getElementById('message').style.display = "none";
-                changeLength(5, true);
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const sharedW = urlParams.get('w');
+
+                if (sharedW) {
+                    try {
+                        const decoded = atob(sharedW).toUpperCase();
+                        wordLength = decoded.length;
+                        secretWord = decoded;
+                        isSharedGame = true;
+                        document.getElementById('length-select').value = wordLength;
+                    } catch (e) { console.error("Invalid link"); }
+                }
+
+                changeLength(wordLength, true);
 
                 document.addEventListener("keydown", (e) => {
                     if (isGameOver || document.activeElement.id === 'classic-input') return;
@@ -301,8 +325,16 @@
         }
 
         function checkWinCondition() {
-            if (currentGuess === secretWord) { showMsg("🎉 Correct!", true); isGameOver = true; }
-            else if (++currentRow >= maxGuesses) { showMsg("Answer: " + secretWord, true); isGameOver = true; }
+            if (currentGuess === secretWord) {
+                showMsg("🎉 Correct!", true);
+                isGameOver = true;
+                document.getElementById('share-btn').style.display = 'inline-block';
+            }
+            else if (++currentRow >= maxGuesses) {
+                showMsg("Answer: " + secretWord, true);
+                isGameOver = true;
+                document.getElementById('share-btn').style.display = 'inline-block';
+            }
             else { currentGuess = ""; document.getElementById('classic-input').value = ""; }
         }
 
@@ -326,10 +358,37 @@
             });
         }
 
+        function shareResult() {
+            const tiles = [];
+            const lastRow = (currentGuess === secretWord) ? currentRow : maxGuesses - 1;
+            
+            for (let r = 0; r <= lastRow; r++) {
+                let rowEmoji = "";
+                for (let c = 0; c < wordLength; c++) {
+                    const tile = document.getElementById(`tile-${r * wordLength + c}`);
+                    if (!tile) continue;
+                    if (tile.classList.contains("correct")) rowEmoji += "🟩";
+                    else if (tile.classList.contains("present")) rowEmoji += "🟨";
+                    else if (tile.classList.contains("absent")) rowEmoji += "⬛";
+                }
+                if (rowEmoji !== "") tiles.push(rowEmoji);
+            }
+
+            const encodedWord = btoa(secretWord);
+            const shareUrl = `${window.location.origin}${window.location.pathname}?w=${encodedWord}`;
+            const attempts = (currentGuess === secretWord) ? currentRow + 1 : "X";
+            const resultText = `Wordle (${wordLength} Letters) ${attempts}/${maxGuesses}\n\n${tiles.join('\n')}\n\nPlay this word: ${shareUrl}`;
+
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(resultText);
+                // メッセージ表示を削除しました
+            }
+        }
+
         function showMsg(t, persist = false) {
             const m = document.getElementById('message');
             m.textContent = t; m.style.display = "block";
-            if(!persist) setTimeout(() => m.style.display="none", 2000);
+            if(!persist) setTimeout(() => m.style.display="none", 2500);
         }
 
         function shakeRow() {
@@ -346,16 +405,24 @@
 
         function startNewRound() {
             if (currentWordList.length === 0) return;
-            secretWord = currentWordList[Math.floor(Math.random() * currentWordList.length)];
-            console.log("Secret:", secretWord);
+            if (!isSharedGame) {
+                secretWord = currentWordList[Math.floor(Math.random() * currentWordList.length)];
+            }
+            isSharedGame = false;
             currentRow = 0; currentGuess = ""; isGameOver = false; keyStates = {};
             createBoard();
+            document.getElementById('share-btn').style.display = 'none';
             document.querySelectorAll(".key").forEach(k => k.classList.remove("correct", "present", "absent"));
             document.getElementById('classic-input').value = "";
             document.getElementById('message').style.display = "none";
         }
 
-        function resetGame() { if (isGameOver || confirm("Reset game?")) startNewRound(); }
+        function resetGame() { 
+            if (window.location.search) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            if (isGameOver || confirm("Reset game?")) startNewRound(); 
+        }
 
         initGame();
     </script>
